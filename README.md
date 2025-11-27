@@ -37,4 +37,5 @@ Options:
 - Trickle ICE  
 - Client for better IP Handling and video handling (maybe even lowering latency even more)  
 - Web UI  
+- Unit tests  
 - Chat with data channel (maybe ?)  
