@@ -69,8 +69,6 @@ async function send_sdp_offer(identifier) {
     }).then((res) => {
         return res.text();
     }).then(async (answer) => {
-        console.log("Answer:");
-        console.log(answer);
         return connections[identifier].setRemoteDescription({
             type: "answer",
             sdp: answer
