@@ -24,6 +24,7 @@ RUN cargo build --release
 FROM debian:trixie-slim
 WORKDIR /app
 
+ENV PORT=
 ENV UDP_MUX_PORT=
 ENV NAT_IPS=
 

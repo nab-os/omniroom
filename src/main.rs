@@ -46,12 +46,16 @@ use uuid::Uuid;
 /// Whip signaling broadcast server
 #[derive(FromArgs)]
 struct Args {
+    /// an optional port to setup the web server
+    #[argh(option, short = 'p')]
+    port: Option<u16>,
+
     /// an optional port to setup udp muxing
-    #[argh(option)]
+    #[argh(option, short = 'u')]
     udp_mux_port: Option<u16>,
 
     /// an optional list of ips separated by '|' to setup nat 1 to 1
-    #[argh(option)]
+    #[argh(option, short = 'i')]
     nat_ips: Option<String>,
 }
 
@@ -357,6 +361,15 @@ async fn main() -> std::io::Result<()> {
     // Settings
     let mut setting_engine = SettingEngine::default();
 
+    let mut web_port: Option<u16> = match env::var("PORT").ok() {
+        Some(port) => port.parse::<u16>().ok(),
+        None => None,
+    };
+    if let Some(port) = args.port {
+        web_port = Some(port);
+    }
+    let web_port = web_port.unwrap_or(8080);
+
     let mut udp_mux_port: Option<u16> = match env::var("UDP_MUX_PORT").ok() {
         Some(port) => port.parse::<u16>().ok(),
         None => None,
@@ -423,7 +436,7 @@ async fn main() -> std::io::Result<()> {
             )
             .default_service(web::to(not_found))
     })
-    .bind(("0.0.0.0", 8080))?
+    .bind(("0.0.0.0", web_port))?
     .run()
     .await
 }
