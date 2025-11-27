@@ -9,6 +9,13 @@ git clone https://github.com/nab-os/omniroom
 cd omniroom
 cargo build
 ```
+
+### Docker compose
+Install docker & docker compose  
+Just copy the `compose.yml` file from the repository  
+```
+sudo docker compose up -d
+```
   
 ## Usage
 ```
@@ -27,6 +34,6 @@ Options:
   
 ## Todo
 - Trickle ICE  
-- Chat with data stream  
-- Web UI  
 - Client for better IP Handling and video handling (maybe even lowering latency even more)  
+- Web UI  
+- Chat with data channel (maybe ?)  
