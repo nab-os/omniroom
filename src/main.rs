@@ -1,6 +1,6 @@
 use std::{collections::HashMap, env, sync::Arc, time::Duration};
 
-use argh::FromArgs;
+use argh::{FromArgs, from_env};
 
 use actix_cors::Cors;
 use actix_files as fs;
@@ -31,8 +31,7 @@ use webrtc::{
     interceptor::registry::Registry,
     peer_connection::{
         RTCPeerConnection, configuration::RTCConfiguration,
-        peer_connection_state::RTCPeerConnectionState,
-        sdp::session_description::RTCSessionDescription, signaling_state::RTCSignalingState,
+        sdp::session_description::RTCSessionDescription,
     },
     rtcp::payload_feedbacks::picture_loss_indication::PictureLossIndication,
     rtp_transceiver::rtp_codec::{RTCRtpCodecCapability, RTPCodecType},
@@ -301,7 +300,7 @@ async fn not_found() -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
-    let args: Args = argh::from_env();
+    let args: Args = from_env();
 
     let config = RTCConfiguration {
         ice_servers: vec![RTCIceServer {
