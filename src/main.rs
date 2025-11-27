@@ -10,14 +10,22 @@ use actix_web::{
 };
 use actix_web_httpauth::extractors::bearer::BearerAuth;
 
-use tokio::sync::Mutex;
+use tokio::{net::UdpSocket, sync::Mutex};
 use webrtc::{
     api::{
         API, APIBuilder,
         interceptor_registry::register_default_interceptors,
         media_engine::{MIME_TYPE_H264, MIME_TYPE_OPUS, MediaEngine},
+        setting_engine::SettingEngine,
     },
-    ice_transport::{ice_candidate::RTCIceCandidate, ice_server::RTCIceServer},
+    ice::{
+        udp_mux::{UDPMuxDefault, UDPMuxParams},
+        udp_network::UDPNetwork,
+    },
+    ice_transport::{
+        ice_candidate::RTCIceCandidate, ice_candidate_type::RTCIceCandidateType,
+        ice_server::RTCIceServer,
+    },
     interceptor::registry::Registry,
     peer_connection::{
         RTCPeerConnection, configuration::RTCConfiguration,
@@ -174,27 +182,29 @@ async fn whip(
     let answer = pc.create_answer(None).await?;
     pc.set_local_description(answer.clone()).await?;
 
+    let pc2 = pc.clone();
     pc.on_ice_candidate(Box::new(move |c: Option<RTCIceCandidate>| {
-        if let Some(candidate) = c {
-            dbg!(candidate.to_string());
-        }
-        Box::pin(async {})
+        let pc2 = pc2.clone();
+        Box::pin(async move {
+            if let Some(candidate) = c {
+                dbg!(candidate.to_json().unwrap().candidate);
+                pc2.add_ice_candidate(candidate.to_json().unwrap())
+                    .await
+                    .unwrap();
+            }
+        })
     }));
 
-    if pc.gathering_complete_promise().await.recv().await.is_none() {
-        return Err(Error::InternalError(
-            "Failed gathering ice candidates".to_string(),
-        ));
-    }
-
-    // pc.add_ice_candidate(RTCIceCandidateInit { candidate: , sdp_mid: todo!(), sdp_mline_index: todo!(), username_fragment: todo!() })
+    pc.gathering_complete_promise().await.recv().await;
 
     whip_data.whips.lock().await.insert(session_id, pc.clone());
+
+    let late_answer = pc.local_description().await.unwrap().sdp;
 
     Ok(HttpResponse::Created()
         .content_type("application/sdp")
         .insert_header(("Location", format!("/api/resource/{session_id}")))
-        .body(pc.local_description().await.unwrap().sdp))
+        .body(late_answer))
 }
 
 #[delete("/resource/{session_id}")]
@@ -230,6 +240,25 @@ async fn whep(
             .new_peer_connection(whip_data.default_config.clone())
             .await?,
     );
+
+    // pc.on_ice_candidate(Box::new(move |c: Option<RTCIceCandidate>| {
+    //     Box::pin(async move {
+    //         if let Some(candidate) = c {
+    //             dbg!(candidate.to_json().unwrap().candidate);
+    //         }
+    //     })
+    // }));
+    // let mut base_config = CandidateBaseConfig::default();
+    // base_config.port = 4004;
+    // base_config.address = "82.64.62.90".to_string();
+    // let candidate_config = CandidateServerReflexiveConfig {
+    //     base_config,
+    //     rel_addr: "0.0.0.0".to_string(),
+    //     rel_port: 4004,
+    // };
+    // let custom_candidate = candidate_config.new_candidate_server_reflexive().unwrap();
+    // dbg!(custom_candidate.to_string());
+    // pc.add_ice_candidate(custom_candidate.);
 
     let video_track = Arc::new(TrackLocalStaticRTP::new(
         RTCRtpCodecCapability {
@@ -277,19 +306,17 @@ async fn whep(
     let answer = pc.create_answer(None).await?;
     pc.set_local_description(answer.clone()).await?;
 
-    if pc.gathering_complete_promise().await.recv().await.is_none() {
-        return Err(Error::InternalError(
-            "Failed gathering ice candidates".to_string(),
-        ));
-    }
+    pc.gathering_complete_promise().await.recv().await;
 
     let mut whips = whip_data.whips.lock().await;
-    whips.insert(session_id, pc);
+    whips.insert(session_id, pc.clone());
+
+    let late_answer = pc.local_description().await.unwrap().sdp;
 
     Ok(HttpResponse::Created()
         .content_type("application/sdp")
         .insert_header(("Location", format!("/api/resource/{session_id}")))
-        .body(answer.sdp))
+        .body(late_answer))
 }
 
 async fn not_found(req: HttpRequest) -> impl Responder {
@@ -299,6 +326,8 @@ async fn not_found(req: HttpRequest) -> impl Responder {
 
 #[actix_web::main]
 async fn main() -> std::io::Result<()> {
+    let args: Args = argh::from_env();
+
     let config = RTCConfiguration {
         ice_servers: vec![RTCIceServer {
             urls: vec!["stun:stun.l.google.com:19302".to_owned()],
@@ -310,11 +339,17 @@ async fn main() -> std::io::Result<()> {
     // Api build
     let mut m = MediaEngine::default();
     m.register_default_codecs().unwrap();
+    let udp_socket = UdpSocket::bind(("0.0.0.0", 4004)).await.unwrap();
+    let udp_mux = UDPMuxDefault::new(UDPMuxParams::new(udp_socket));
+    let mut setting_engine = SettingEngine::default();
+    setting_engine.set_udp_network(UDPNetwork::Muxed(udp_mux));
+    setting_engine.set_nat_1to1_ips(vec!["public_ip".to_string()], RTCIceCandidateType::Srflx);
     let mut registry = Registry::new();
     registry = register_default_interceptors(registry, &mut m).unwrap();
     let api = APIBuilder::new()
         .with_media_engine(m)
         .with_interceptor_registry(registry)
+        .with_setting_engine(setting_engine)
         .build();
 
     let whip_data = Data::new(WhipData {
