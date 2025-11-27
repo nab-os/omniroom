@@ -62,7 +62,7 @@ async function send_sdp_offer(identifier) {
              Accept: "application/sdp",
             "Content-Type": "application/sdp",
             Authorization: "Bearer " + identifier,
-            "User-Agent": "whip-rs"
+            "User-Agent": "omniroom"
         },
         method: "POST",
         body: connections[identifier].localDescription.sdp,

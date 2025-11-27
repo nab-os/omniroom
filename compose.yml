@@ -1,8 +1,8 @@
 services:
-  whip-rs:
+  omniroom:
     image: 4gjr3z1t/omniroom:dev
-    hostname: whip-rs
-    container_name: whip-rs
+    hostname: omniroom
+    container_name: omniroom
     environment:
       - PORT=8080
       - UDP_MUX_PORT=4004
