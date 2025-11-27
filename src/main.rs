@@ -55,6 +55,9 @@ pub enum Error {
 
     #[error("Webrtc Error: {0}")]
     WebrtcError(#[from] webrtc::Error),
+
+    #[error("Internal Error: {0}")]
+    InternalError(String),
 }
 
 impl ResponseError for Error {
@@ -64,6 +67,7 @@ impl ResponseError for Error {
             Error::SessionInsertError(_) => StatusCode::SERVICE_UNAVAILABLE,
             Error::BadUuid(_) => StatusCode::BAD_REQUEST,
             Error::WebrtcError(_) => StatusCode::INTERNAL_SERVER_ERROR,
+            Error::InternalError(_) => StatusCode::INTERNAL_SERVER_ERROR,
         }
     }
 
@@ -177,7 +181,11 @@ async fn whip(
         Box::pin(async {})
     }));
 
-    pc.gathering_complete_promise().await.recv().await;
+    if pc.gathering_complete_promise().await.recv().await.is_none() {
+        return Err(Error::InternalError(
+            "Failed gathering ice candidates".to_string(),
+        ));
+    }
 
     // pc.add_ice_candidate(RTCIceCandidateInit { candidate: , sdp_mid: todo!(), sdp_mline_index: todo!(), username_fragment: todo!() })
 
@@ -269,7 +277,11 @@ async fn whep(
     let answer = pc.create_answer(None).await?;
     pc.set_local_description(answer.clone()).await?;
 
-    pc.gathering_complete_promise().await.recv().await;
+    if pc.gathering_complete_promise().await.recv().await.is_none() {
+        return Err(Error::InternalError(
+            "Failed gathering ice candidates".to_string(),
+        ));
+    }
 
     let mut whips = whip_data.whips.lock().await;
     whips.insert(session_id, pc);
