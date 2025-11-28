@@ -1,6 +1,7 @@
 use std::{env, sync::Arc};
 use webrtc::{
     api::media_engine::{MIME_TYPE_H264, MIME_TYPE_OPUS},
+    peer_connection::sdp::session_description::RTCSessionDescription,
     rtp_transceiver::rtp_codec::RTCRtpCodecCapability,
     track::track_local::{TrackLocal, track_local_static_rtp::TrackLocalStaticRTP},
 };
@@ -26,8 +27,12 @@ use webrtc::{
 /// Whip signaling broadcast server
 #[derive(FromArgs)]
 struct Args {
-    /// an optional port to setup udp muxing
+    /// a required whip server url to negotiate with
     #[argh(option, short = 'u')]
+    server_url: String,
+
+    /// an optional port to setup udp muxing
+    #[argh(option, short = 'm')]
     udp_mux_port: Option<u16>,
 
     /// an optional list of ips separated by '|' to setup nat 1 to 1
@@ -41,8 +46,8 @@ pub enum Error {
     #[error("Webrtc Error: {0}")]
     WebrtcError(#[from] webrtc::Error),
 
-    #[error("Internal Error: {0}")]
-    InternalError(String),
+    #[error("Reqwest Error: {0}")]
+    ReqwestError(#[from] reqwest::Error),
 }
 
 #[tokio::main]
@@ -99,6 +104,9 @@ async fn main() -> Result<()> {
         .with_setting_engine(setting_engine)
         .build();
 
+    let client = reqwest::Client::new();
+
+    // New Peer Connection
     let pc = Arc::new(api.new_peer_connection(default_config).await?);
 
     let video_track = Arc::new(TrackLocalStaticRTP::new(
@@ -168,10 +176,16 @@ async fn main() -> Result<()> {
     pc.gathering_complete_promise().await.recv().await;
 
     let late_offer = pc.local_description().await.unwrap().sdp;
-    println!("{}", late_offer);
-    // reqwest POST offer then:
-    // pc.set_remote_description(RTCSessionDescription::offer(offer)?)
-    //     .await?;
+
+    let answer = client
+        .post(args.server_url)
+        .body(late_offer)
+        .send()
+        .await?
+        .text()
+        .await?;
+    pc.set_remote_description(RTCSessionDescription::offer(answer)?)
+        .await?;
 
     Ok(())
 }
