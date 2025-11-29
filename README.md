@@ -1,8 +1,9 @@
 # Omniroom
-Simple whip broadcast server and client made with Rust
+Simple whip broadcast server and client made with Rust  
+[A french note I wrote to explain what I plan with this project](https://nablog.fr/realisations/omniroom/0002/)
 
 ## Performances
-Latency around 20ms with [meetecho/simple-whip-client](https://github.com/meetecho/simple-whip-client) as a client OBS as a virtual webcam.  
+Latency around 20ms with [meetecho/simple-whip-client](https://github.com/meetecho/simple-whip-client) as a client OBS as a virtual webcam on a local network.  
 
 ## Workspace architecture
 The project contains:  
