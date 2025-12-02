@@ -7,7 +7,7 @@ use actix_files as fs;
 use actix_web::{
     App, HttpRequest, HttpResponse, HttpServer, Responder, ResponseError, delete,
     http::{StatusCode, header::ContentType},
-    middleware, post,
+    middleware, options, patch, post,
     web::{self, Data, Path},
 };
 use actix_web_httpauth::extractors::bearer::BearerAuth;
@@ -102,6 +102,21 @@ impl ResponseError for Error {
             .insert_header(ContentType::html())
             .body(self.to_string())
     }
+}
+
+#[options("/whip")]
+async fn whip_options(whip_data: Data<WhipData>) -> Result<impl Responder> {
+    let mut res = HttpResponse::Created();
+    res.content_type("application/sdp");
+
+    // Headers
+    for ice_server in whip_data.default_config.ice_servers.iter() {
+        for url in ice_server.urls.iter() {
+            res.insert_header(("Link", format!("<{url}>; rel=\"ice-server\";")));
+        }
+    }
+
+    Ok(HttpResponse::Ok())
 }
 
 #[post("/whip")]
@@ -199,7 +214,7 @@ async fn whip(
 }
 
 #[delete("/resource/{session_id}")]
-async fn whip_stop(
+async fn whip_delete(
     auth: BearerAuth,
     session_id: Path<String>,
     whip_data: Data<WhipData>,
@@ -212,6 +227,19 @@ async fn whip_stop(
 
     let mut subscriptions = whip_data.subscriptions.lock().await;
     subscriptions.remove(&stream_key);
+    Ok(HttpResponse::Ok())
+}
+
+#[patch("/resource/{session_id}")]
+async fn whip_patch(
+    auth: BearerAuth,
+    session_id: Path<String>,
+    ice_candidate: String,
+    whip_data: Data<WhipData>,
+) -> Result<impl Responder> {
+    dbg!(ice_candidate);
+    let mut res = HttpResponse::Created();
+    res.content_type("application/sdp");
     Ok(HttpResponse::Ok())
 }
 
@@ -386,9 +414,11 @@ async fn main() -> std::io::Result<()> {
             .app_data(Data::clone(&whip_data.clone()))
             .service(
                 web::scope("/api")
+                    .service(whip_options)
                     .service(whip)
+                    .service(whip_patch)
                     .service(whep)
-                    .service(whip_stop),
+                    .service(whip_delete),
             )
             .service(
                 fs::Files::new("", "./static")
