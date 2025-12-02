@@ -5,7 +5,7 @@ use argh::{FromArgs, from_env};
 use actix_cors::Cors;
 use actix_files as fs;
 use actix_web::{
-    App, HttpResponse, HttpServer, Responder, ResponseError, delete,
+    App, HttpRequest, HttpResponse, HttpServer, Responder, ResponseError, delete,
     http::{StatusCode, header::ContentType},
     middleware, post,
     web::{self, Data, Path},
@@ -184,10 +184,18 @@ async fn whip(
 
     let late_answer = pc.local_description().await.unwrap().sdp;
 
-    Ok(HttpResponse::Created()
-        .content_type("application/sdp")
-        .insert_header(("Location", format!("/api/resource/{session_id}")))
-        .body(late_answer))
+    let mut res = HttpResponse::Created();
+    res.content_type("application/sdp");
+
+    // Headers
+    res.insert_header(("Location", format!("/api/resource/{session_id}")));
+    for ice_server in whip_data.default_config.ice_servers.iter() {
+        for url in ice_server.urls.iter() {
+            res.insert_header(("Link", format!("<{url}>; rel=\"ice-server\";")));
+        }
+    }
+
+    Ok(res.body(late_answer))
 }
 
 #[delete("/resource/{session_id}")]
@@ -276,13 +284,22 @@ async fn whep(
 
     let late_answer = pc.local_description().await.unwrap().sdp;
 
-    Ok(HttpResponse::Created()
-        .content_type("application/sdp")
-        .insert_header(("Location", format!("/api/resource/{session_id}")))
-        .body(late_answer))
+    let mut res = HttpResponse::Created();
+    res.content_type("application/sdp");
+
+    // Headers
+    res.insert_header(("Location", format!("/api/resource/{session_id}")));
+    for ice_server in whip_data.default_config.ice_servers.iter() {
+        for url in ice_server.urls.iter() {
+            res.insert_header(("Link", format!("<{url}>; rel=\"ice-server\";")));
+        }
+    }
+
+    Ok(res.body(late_answer))
 }
 
-async fn not_found() -> impl Responder {
+async fn not_found(req: HttpRequest) -> impl Responder {
+    dbg!(req);
     HttpResponse::NotFound()
 }
 
