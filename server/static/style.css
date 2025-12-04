@@ -1,0 +1,32 @@
+/* palette: https://coolors.co/fb3640-343332-2f3945-2a3e58-1f487e-247ba0 */
+:root {
+  --primary-bg-color: #343332;
+  --secondary-bg-color: #2F3945;
+}
+
+html {
+  margin: 0;
+  padding: 0;
+}
+
+body {
+  background-color: var(--primary-bg-color);
+  opacity: 0.8;
+  background-image: linear-gradient(45deg, var(--primary-bg-color) 50%, var(--secondary-bg-color) 50%);
+  background-size: 3px 3px;
+
+  width: 100vw;
+  height: 100vh;
+
+  margin: 0;
+  padding: 0;
+  
+  display: flex;
+  flex-direction: column;
+  justify-content: space-around;
+  align-items: center;
+}
+
+video {
+  background-color: black;
+}
