@@ -499,7 +499,7 @@ async fn main() -> std::io::Result<()> {
     HttpServer::new(move || {
         let cors = Cors::default()
             .allow_any_origin()
-            .allowed_methods(["POST", "DELETE", "PATCH"])
+            .allowed_methods(["OPTIONS", "POST", "DELETE", "PATCH"])
             .allow_any_header();
 
         App::new()
